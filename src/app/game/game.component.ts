@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Http } from "@angular/http";
 import { Game, User, Quote } from '../models/game';
 
 @Component({
@@ -9,13 +10,24 @@ import { Game, User, Quote } from '../models/game';
 export class GameComponent implements OnInit {
 
     Model = new Game();
-    Me = new User();
+    Me: User;
+    private _api = "http://localhost:8080/game";
 
-  constructor() {
-    this.Me.Name = "Moshe Plotkin"
+  constructor(private http: Http) {
+    setInterval(()=> this.refresh(), 1000)
   }
 
   ngOnInit() {
+  }
+
+  refresh(){
+    this.http.get(this._api + "/state")
+        .subscribe(data=> this.Model = data.json())
+  }
+
+  flipPicture(e: MouseEvent){
+    this.http.post(this._api + "/picture",{})
+        .subscribe();
   }
 
   submitQuote(e: MouseEvent, text: string){
@@ -23,12 +35,21 @@ export class GameComponent implements OnInit {
 
     if(this.MyPlayedQuote()) return;
 
-    this.Model.PlayedQuotes.push({ Text: text, PlayerName: this.Me.Name, Chosen: false });
-    this.Model.MyQuotes.splice( this.Model.MyQuotes.indexOf(text), 1 );
+    this.http.post(this._api + "/quotes", { Text: text, PlayerId: this.Me.Name })
+        .subscribe(data=> {
+            if(data.json().success){
+                this.Me.MyQuotes.splice( this.Me.MyQuotes.indexOf(text), 1 );
+            }
+        });
   }
 
-  MyPlayedQuote(): Quote | null {
-    return this.Model.PlayedQuotes.find( x => x.PlayerName == this.Me.Name );
+  login(name: string){
+    this.http.get(this._api + "/quotes", { params : { playerId: name } })
+    .subscribe(data=> this.Me =  {Name: name, MyQuotes: data.json() } )
   }
 
+  MyPlayedQuote = () => this.Model.PlayedQuotes.find( x => x.PlayerId == this.Me.Name );
+  ChosenQuote = () => this.Model.PlayedQuotes.find( x => x.Chosen );
+  IsEveryoneDone = () => this.Model.PlayedQuotes.length == this.Model.Players.length - 1;
+  IAmTheDealer = () => this.Me.Name == this.Model.DealerId;
 }
